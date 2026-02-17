@@ -202,6 +202,7 @@ function render(){
   else if(state.tab==='progress') renderProgress(scroll);
   else if(state.tab==='history') renderHistoryTab(scroll);
   else if(state.tab==='settings') renderSettings(scroll);
+  else if(state.tab==='name') renderName(scroll);
   app.appendChild(scroll);
   save();
 }
@@ -210,7 +211,7 @@ function renderNavbar(){
   return h('div',{class:'navbar'},
     h('h1',{},'⚡ HIT'),
     h('div',{class:'nav-tabs'},
-      ...([['home','Train'],['progress','Charts'],['history','Log'],['settings','Setup']]).map(([id,l])=>
+      ...([['home','Train'],['progress','Charts'],['history','Log'],['settings','Setup'],['name','Name']]).map(([id,l])=>
         h('button',{class:'nav-tab'+(state.tab===id?' active':''),onClick:()=>setState({tab:id})},l)
       )
     )
@@ -661,6 +662,17 @@ function renderAddExModal(app){
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
+
+// ── Name ─────────────────────────────────────────────────────────────────────
+function renderName(p){
+  p.style.cssText='display:flex;align-items:center;justify-content:center;height:100%;background:var(--bg)';
+  const wrap=h('div',{style:{textAlign:'center',padding:'20px'}});
+  const name=h('div',{style:{fontSize:'min(22vw, 18vh)','fontWeight':'900','letterSpacing':'0.05em','color':'var(--text)','lineHeight':'1','fontFamily':'-apple-system,BlinkMacSystemFont,sans-serif','textTransform':'uppercase'}}, 'HELLERMANN');
+  const hint=h('div',{style:{marginTop:'24px',fontSize:'13px','color':'var(--text3)'}}, 'H · E · L · L · E · R · M · A · N · N');
+  wrap.appendChild(name);
+  wrap.appendChild(hint);
+  p.appendChild(wrap);
+}
 document.addEventListener("DOMContentLoaded",function(){try{render();}catch(e){var d=document.createElement("div");d.style.cssText="color:#ff6b6b;padding:24px;font-family:monospace;font-size:13px;background:#0a0a0f;height:100%;overflow:auto";d.textContent="ERROR: "+e.message;document.body.appendChild(d);}});
 </script>
 </body>
