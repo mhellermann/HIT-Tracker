@@ -138,13 +138,15 @@ let state={
   activeWorkout:null,
   modal:null,
   _chartEx:null,
-  _chartMetric:'weight'
+  _chartMetric:'weight',
+  trackingMode:S.get('hit_trackingMode','reps')
 };
 
 function save(){
   S.set('hit_history',state.history);
   S.set('hit_templates',state.templates);
   S.set('hit_exercises',state.exercises);
+  S.set('hit_trackingMode',state.trackingMode);
 }
 function setState(patch){Object.assign(state,patch);render();}
 const uid=()=>'id_'+Math.random().toString(36).slice(2,9);
@@ -230,6 +232,21 @@ function renderHome(p){
     h('div',{class:'stat-card'},h('div',{class:'stat-val'},week),h('div',{class:'stat-lbl'},'This Week')),
     h('div',{class:'stat-card'},h('div',{class:'stat-val'},last?dateStr(last.date):'—'),h('div',{class:'stat-lbl'},'Last'))
   ));
+  // Tracking mode toggle
+  const toggleWrap=h('div',{style:{margin:'4px 14px 0',display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--rs)',padding:'12px 16px'}});
+  toggleWrap.appendChild(h('div',{},
+    h('div',{style:{fontSize:'14px',fontWeight:'600'}},'Measuring'),
+    h('div',{style:{fontSize:'12px',color:'var(--text3)',marginTop:'2px'}},state.trackingMode==='reps'?'Counting reps per exercise':'Time under tension per exercise')
+  ));
+  const toggle=h('div',{style:{display:'flex',gap:'4px',background:'var(--bg)',borderRadius:'8px',padding:'3px'}});
+  ['reps','tul'].forEach(mode=>{
+    const btn=h('button',{style:{padding:'7px 14px',borderRadius:'6px',fontSize:'13px',fontWeight:'600',border:'none',cursor:'pointer',background:state.trackingMode===mode?'var(--accent)':'transparent',color:state.trackingMode===mode?'#fff':'var(--text2)',transition:'all .2s'}},mode==='reps'?'Reps':'TUL');
+    btn.onclick=()=>{state.trackingMode=mode;save();render();};
+    toggle.appendChild(btn);
+  });
+  toggleWrap.appendChild(toggle);
+  p.appendChild(toggleWrap);
+
   if(!state.templates.length){
     p.appendChild(h('div',{class:'card'},h('div',{class:'empty'},h('div',{class:'empty-icon'},'📋'),h('p',{},'Go to Setup to create your first workout template.'))));
     return;
@@ -250,7 +267,7 @@ function renderHome(p){
 function startWorkout(t){
   if(!t.exercises.length){alert('Add exercises to this template in Setup first.');return;}
   SW.reset();
-  setState({activeWorkout:{template:t,startTime:Date.now(),logged:{}}});
+  setState({activeWorkout:{template:t,startTime:Date.now(),logged:{},trackingMode:state.trackingMode}});
 }
 
 // ── Active Workout ───────────────────────────────────────────────────────────
@@ -307,11 +324,13 @@ function finishWorkout(){
   setState({tab:'history'});
 }
 
+
 // ── Log Modal ────────────────────────────────────────────────────────────────
 function openLogModal(ex){
   const prev=getLastSet(ex),current=state.activeWorkout.logged[ex];
+  const mode=state.activeWorkout.trackingMode||'reps';
   SW.reset();
-  state.modal={type:'log',exName:ex,prev,weight:current?.weight||'',reps:current?.reps||'',tul:current?.tul||0,tulMode:'stopwatch',swElapsed:0};
+  state.modal={type:'log',exName:ex,prev,weight:current?.weight||'',reps:current?.reps||'',tul:current?.tul||0,tulMode:'stopwatch',swElapsed:0,trackingMode:mode};
   render();
 }
 
@@ -325,6 +344,7 @@ function renderModal(app){
 
 function renderLogModal(app){
   const m=state.modal;
+  const mode=m.trackingMode||'reps';
   const ov=h('div',{class:'overlay',onClick:e=>{if(e.target===ov){SW.reset();setState({modal:null});}}});
   const modal=h('div',{class:'modal'});
   ov.appendChild(modal);
@@ -333,23 +353,42 @@ function renderLogModal(app){
   modal.appendChild(h('div',{class:'modal-sub'},'Log your working set'));
   if(m.prev){
     const parts=[];
-    if(m.prev.weight) parts.push(`${m.prev.weight} lbs`);
-    if(m.prev.reps) parts.push(`${m.prev.reps} reps`);
-    if(m.prev.tul) parts.push(fmt(m.prev.tul)+' TUL');
-    modal.appendChild(h('div',{class:'prev-badge'},
+    if(m.prev.weight) parts.push(m.prev.weight+' lbs');
+    if(mode==='reps'&&m.prev.reps) parts.push(m.prev.reps+' reps');
+    if(mode==='tul'&&m.prev.tul) parts.push(fmt(m.prev.tul)+' TUL');
+    if(parts.length) modal.appendChild(h('div',{class:'prev-badge'},
       h('span',{class:'prev-item'},'Last: '),
       ...parts.map(p=>h('span',{class:'prev-item'},h('b',{},p)))
     ));
   }
-  // Weight
+  // Weight — no reModal on input so keyboard stays up
   modal.appendChild(h('div',{class:'input-label',style:{marginBottom:'6px'}},'Weight (lbs)'));
-  modal.appendChild(makeStepper(m.weight,5,v=>{state.modal.weight=v;reModal();},false));
+  (function(){
+    const row=h('div',{class:'stepper'});
+    row.appendChild(h('div',{class:'step-btn',onClick:()=>{state.modal.weight=Math.max(0,(Number(state.modal.weight)||0)-5);reModal();}},'−'));
+    const inp=h('input',{class:'step-val',type:'number',value:m.weight,placeholder:'0',inputmode:'decimal'});
+    inp.addEventListener('input',e=>{state.modal.weight=e.target.value;});
+    row.appendChild(inp);
+    row.appendChild(h('div',{class:'step-btn',onClick:()=>{state.modal.weight=(Number(state.modal.weight)||0)+5;reModal();}},'+')); 
+    modal.appendChild(row);
+  })();
   modal.appendChild(h('div',{style:{height:14}}));
-  // Reps
-  modal.appendChild(h('div',{class:'input-label',style:{marginBottom:'6px'}},'Reps'));
-  modal.appendChild(makeStepper(m.reps,1,v=>{state.modal.reps=v;reModal();},false));
-  modal.appendChild(h('div',{style:{height:14}}));
+  // Reps — only show in reps mode
+  if(mode==='reps'){
+    modal.appendChild(h('div',{class:'input-label',style:{marginBottom:'6px'}},'Reps'));
+    (function(){
+      const row=h('div',{class:'stepper'});
+      row.appendChild(h('div',{class:'step-btn',onClick:()=>{state.modal.reps=Math.max(0,(Number(state.modal.reps)||0)-1);reModal();}},'−'));
+      const inp=h('input',{class:'step-val',type:'number',value:m.reps,placeholder:'0',inputmode:'numeric'});
+      inp.addEventListener('input',e=>{state.modal.reps=e.target.value;});
+      row.appendChild(inp);
+      row.appendChild(h('div',{class:'step-btn',onClick:()=>{state.modal.reps=(Number(state.modal.reps)||0)+1;reModal();}},'+')); 
+      modal.appendChild(row);
+    })();
+    modal.appendChild(h('div',{style:{height:14}}));
+  }
   // TUL
+  if(mode==='tul'){
   modal.appendChild(h('div',{class:'input-label',style:{marginBottom:'8px'}},'Time Under Load'));
   const tt=h('div',{class:'tul-tabs'});
   ['stopwatch','manual'].forEach(mode=>{
@@ -377,6 +416,7 @@ function renderLogModal(app){
   } else {
     modal.appendChild(makeStepper(m.tul,5,v=>{state.modal.tul=v;reModal();},true));
   }
+  } // end tul mode
   modal.appendChild(h('div',{style:{height:20}}));
   modal.appendChild(h('button',{class:'btn btn-primary',onClick:saveSet},'✓ Save Set'));
   modal.appendChild(h('div',{style:{height:10}}));
