@@ -581,7 +581,7 @@ function renderEditWorkoutModal(app){
   modal.appendChild(h('button',{class:'btn btn-primary',onClick:()=>{
     const w=state.history.find(x=>x.id===m.workout.id);
     if(w){
-      w.date=new Date(m.date).getTime()||w.date;
+      const [yr,mo,dy]=m.date.split('-').map(Number);w.date=new Date(yr,mo-1,dy,12,0,0).getTime()||w.date;
       w.comments=m.comments.trim();
     }
     // Re-sort history by date
