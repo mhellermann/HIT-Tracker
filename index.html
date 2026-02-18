@@ -337,6 +337,7 @@ function openLogModal(ex){
 function renderModal(app){
   const m=state.modal;
   if(m.type==='log') renderLogModal(app);
+  else if(m.type==='editWorkout') renderEditWorkoutModal(app);
   else if(m.type==='addTemplate') renderTemplateModal(app,false);
   else if(m.type==='editTemplate') renderTemplateModal(app,true);
   else if(m.type==='addExercise') renderAddExModal(app);
@@ -534,12 +535,62 @@ function renderHistoryTab(p){
       chips.appendChild(h('span',{class:'chip'},parts.join(' ')));
     });
     detail.appendChild(chips);
-    row.appendChild(detail);
-    row.appendChild(h('button',{class:'btn-icon',style:{color:'var(--accent2)',fontSize:13,minWidth:'36px',minHeight:'36px'},
+    if(w.comments) detail.appendChild(h('div',{style:{fontSize:12,color:'var(--text2)',marginTop:6,fontStyle:'italic'}},'"'+w.comments+'"'));
+    const actions=h('div',{style:{display:'flex',flexDirection:'column',gap:'5px',flexShrink:0}});
+    actions.appendChild(h('button',{class:'btn-icon',style:{fontSize:13,minWidth:'36px',minHeight:'36px'},
+      onClick:()=>{state.modal={type:'editWorkout',workout:w,date:new Date(w.date).toISOString().slice(0,10),comments:w.comments||''};render();}},'✏️'));
+    actions.appendChild(h('button',{class:'btn-icon',style:{color:'var(--accent2)',fontSize:13,minWidth:'36px',minHeight:'36px'},
       onClick:()=>{if(confirm('Delete this workout?')){state.history=state.history.filter(x=>x.id!==w.id);setState({});}}},'🗑'));
+    row.appendChild(detail);
+    row.appendChild(actions);
     card.appendChild(row);
   });
   p.appendChild(card);
+}
+
+
+// ── Edit Workout Modal ────────────────────────────────────────────────────────
+function renderEditWorkoutModal(app){
+  const m=state.modal;
+  const ov=h('div',{class:'overlay',onClick:e=>{if(e.target===ov)setState({modal:null});}});
+  const modal=h('div',{class:'modal'});
+  ov.appendChild(modal);
+  modal.appendChild(h('div',{class:'modal-handle'}));
+  modal.appendChild(h('div',{class:'modal-title'},'Edit Workout'));
+  modal.appendChild(h('div',{class:'modal-sub'},m.workout.templateName));
+
+  // Date picker
+  modal.appendChild(h('div',{class:'input-label',style:{marginBottom:'6px'}},'Date'));
+  const dateInp=h('input',{class:'input',type:'date',value:m.date});
+  dateInp.addEventListener('change',e=>{state.modal.date=e.target.value;});
+  modal.appendChild(dateInp);
+  modal.appendChild(h('div',{style:{height:14}}));
+
+  // Comments
+  modal.appendChild(h('div',{class:'input-label',style:{marginBottom:'6px'}},'Comments'));
+  modal.appendChild(h('div',{style:{fontSize:12,color:'var(--text3)',marginBottom:6}},'How did it feel? Any injuries, PRs, notes...'));
+  const ta=document.createElement('textarea');
+  ta.className='input';
+  ta.style.cssText='min-height:100px;resize:none;line-height:1.5;font-size:15px';
+  ta.placeholder='e.g. Left shoulder tight, felt strong on leg press...';
+  ta.value=m.comments;
+  ta.addEventListener('input',e=>{state.modal.comments=e.target.value;});
+  modal.appendChild(ta);
+  modal.appendChild(h('div',{style:{height:20}}));
+
+  modal.appendChild(h('button',{class:'btn btn-primary',onClick:()=>{
+    const w=state.history.find(x=>x.id===m.workout.id);
+    if(w){
+      w.date=new Date(m.date).getTime()||w.date;
+      w.comments=m.comments.trim();
+    }
+    // Re-sort history by date
+    state.history.sort((a,b)=>a.date-b.date);
+    setState({modal:null,tab:'history'});
+  }},'✓ Save Changes'));
+  modal.appendChild(h('div',{style:{height:10}}));
+  modal.appendChild(h('button',{class:'btn btn-ghost',style:{width:'100%'},onClick:()=>setState({modal:null})},'Cancel'));
+  app.appendChild(ov);
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
